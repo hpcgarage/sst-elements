@@ -32,6 +32,8 @@
 #include <stdint.h>
 #include <poll.h>
 
+#include <fstream>
+
 #include <string>
 #include <queue>
 #include <unordered_map>
@@ -179,6 +181,9 @@ class ArielCore : public ComponentExtension {
         bool writePayloads;
         uint32_t coreID;
         uint32_t maxPendingTransactions;
+
+        std::string tracefile;
+        std::ofstream tracefp;
 
 #ifdef HAVE_CUDA
         size_t totalTransfer;
