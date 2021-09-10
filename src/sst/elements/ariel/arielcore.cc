@@ -15,6 +15,7 @@
 
 #include <sst_config.h>
 #include "arielcore.h"
+#include <iostream>
 
 #ifdef HAVE_CUDA
 #include <../balar/balar_event.h>
@@ -58,6 +59,11 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
     coreQ = new std::queue<ArielEvent*>();
     pendingTransactions = new std::unordered_map<SimpleMem::Request::id_t, SimpleMem::Request*>();
     pending_transaction_count = 0;
+
+    tracefile = "/tmp/arielcore";
+    tracefile = tracefile + std::to_string((uint64_t)id) + ".ssv";
+
+    tracefp.open(tracefile, std::ios::out | std::ios::trunc);
 
 #ifdef HAVE_CUDA
     midTransfer = false;
@@ -131,6 +137,8 @@ ArielCore::~ArielCore() {
     if(enableTracing && traceGen) {
         delete traceGen;
     }
+
+    tracefp.close();
 }
 
 void ArielCore::setCacheLink(SimpleMem* newLink) {
@@ -835,10 +843,14 @@ bool ArielCore::refillQueue() {
 
                         switch(ac.command) {
                             case ARIEL_PERFORM_READ:
+                                // PAT
+                                    //printf("0 %"PRIu64" %"PRIu64"\n", ac.instPrt, ac.inst.addr);
+                                    tracefp << "0 " << ac.instPtr << " " << ac.inst.addr << std::endl;
                                     createReadEvent(ac.inst.addr, ac.inst.size);
                                     break;
 
                             case ARIEL_PERFORM_WRITE:
+                                    tracefp << "1 " << ac.instPtr << " " << ac.inst.addr << std::endl;
                                     createWriteEvent(ac.inst.addr, ac.inst.size, &ac.inst.payload[0]);
                                     break;
 

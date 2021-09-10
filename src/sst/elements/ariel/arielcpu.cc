@@ -188,6 +188,7 @@ ArielCPU::ArielCPU(ComponentId_t id, Params& params) :
 
         // Set max number of instructions
         cpu_cores[i]->setMaxInsts(max_insts);
+
     }
 
     // Find all the components loaded into the "memory" slot
