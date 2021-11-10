@@ -46,7 +46,12 @@ class ArielEvent {
         ArielEvent();
         virtual ~ArielEvent();
         virtual ArielEventType getEventType() const = 0;
-
+        uint64_t getInstPtr() const {
+            return instPtr;
+        }
+    protected:
+        uint64_t instPtr;
+        // const uint64_t inst
 };
 
 }

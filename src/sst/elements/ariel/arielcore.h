@@ -115,10 +115,10 @@ class ArielCore : public ComponentExtension {
         void fence();
         void unfence();
         void finishCore();
-        void createReadEvent(uint64_t addr, uint32_t size);
-        void createWriteEvent(uint64_t addr, uint32_t size, const uint8_t* payload);
+        void createReadEvent(uint64_t addr, uint32_t size, uint64_t ip);
+        void createWriteEvent(uint64_t addr, uint32_t size, const uint8_t* payload, uint64_t ip);
         void createAllocateEvent(uint64_t vAddr, uint64_t length, uint32_t level, uint64_t ip);
-        void createMmapEvent(uint32_t fileID, uint64_t vAddr, uint64_t length, uint32_t level, uint64_t instPtr);
+        void createMmapEvent(uint32_t fileID, uint64_t vAddr, uint64_t length, uint32_t level, uint64_t ip);
         void createNoOpEvent();
         void createFreeEvent(uint64_t vAddr);
         void createExitEvent();
@@ -222,6 +222,7 @@ class ArielCore : public ComponentExtension {
         const uint32_t verbosity;
         const uint32_t perform_checks;
         bool enableTracing;
+        bool enablePhaseDetection;
         uint64_t currentCycles;
         bool updateCycle;
         char file_path[256];
@@ -255,6 +256,8 @@ class ArielCore : public ComponentExtension {
         Statistic<uint64_t>* statFPSPSIMDIns;
         Statistic<uint64_t>* statFPSPScalarIns;
         Statistic<uint64_t>* statFPSPOps;
+
+        Statistic<uint64_t>* fakeStatPhaseDetection;
 
         uint32_t pending_transaction_count;
         uint32_t pending_gpu_transaction_count;

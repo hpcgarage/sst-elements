@@ -100,7 +100,6 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
     statFPSPOps = registerStatistic<uint64_t>("fp_sp_ops", subID);
     statFPDPOps = registerStatistic<uint64_t>("fp_dp_ops", subID);
 
-    free(subID);
 
     memmgr->registerInterruptHandler(coreID, new ArielMemoryManager::InterruptHandler<ArielCore>(this, &ArielCore::handleInterrupt));
 
@@ -119,6 +118,15 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
 
         traceGen->setCoreID(coreID);
     }
+
+    enablePhaseDetection  = params.find<int>("enablephasedetection") == 1 ? true : false;
+    //Ryan did this
+    if (enablePhaseDetection) {
+        fakeStatPhaseDetection = registerStatistic<uint64_t>("phase_detection", subID);
+    }
+
+    //moved this to after the phase detection part so that I can use subID again
+    free(subID);
 
     currentCycles = 0;
 }
@@ -637,8 +645,8 @@ void ArielCore::createNoOpEvent() {
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a No Op event on core %" PRIu32 "\n", coreID));
 }
 
-void ArielCore::createReadEvent(uint64_t address, uint32_t length) {
-    ArielReadEvent* ev = new ArielReadEvent(address, length);
+void ArielCore::createReadEvent(uint64_t address, uint32_t length, uint64_t instPtr) {
+    ArielReadEvent* ev = new ArielReadEvent(address, length, instPtr);
     coreQ->push(ev);
 
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a READ event, addr=%" PRIu64 ", length=%" PRIu32 "\n", address, length));
@@ -667,8 +675,8 @@ void ArielCore::createFreeEvent(uint64_t vAddr) {
     ARIEL_CORE_VERBOSE(2, output->verbose(CALL_INFO, 2, 0, "Generated a free event for virtual address=%" PRIu64 "\n", vAddr));
 }
 
-void ArielCore::createWriteEvent(uint64_t address, uint32_t length, const uint8_t* payload) {
-    ArielWriteEvent* ev = new ArielWriteEvent(address, length, payload);
+void ArielCore::createWriteEvent(uint64_t address, uint32_t length, const uint8_t* payload, uint64_t instPtr) {
+    ArielWriteEvent* ev = new ArielWriteEvent(address, length, payload, instPtr);
     coreQ->push(ev);
 
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a WRITE event, addr=%" PRIu64 ", length=%" PRIu32 "\n", address, length));
@@ -835,11 +843,11 @@ bool ArielCore::refillQueue() {
 
                         switch(ac.command) {
                             case ARIEL_PERFORM_READ:
-                                    createReadEvent(ac.inst.addr, ac.inst.size);
+                                    createReadEvent(ac.inst.addr, ac.inst.size, ac.instPtr);
                                     break;
 
                             case ARIEL_PERFORM_WRITE:
-                                    createWriteEvent(ac.inst.addr, ac.inst.size, &ac.inst.payload[0]);
+                                    createWriteEvent(ac.inst.addr, ac.inst.size, &ac.inst.payload[0], ac.instPtr);
                                     break;
 
                             case ARIEL_END_INSTRUCTION:
@@ -940,6 +948,10 @@ void ArielCore::handleReadRequest(ArielReadEvent* rEv) {
                             coreID, readAddress, readLength, physAddr));
 
         commitReadEvent(physAddr, readAddress, (uint32_t) readLength);
+        if (enablePhaseDetection) {
+            const uint64_t address = (const uint64_t) rEv->getInstPtr();
+            fakeStatPhaseDetection->addData(address);
+        }
     } else {
         ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Core %" PRIu32 " generating a split read request: Addr=%" PRIu64 " Length=%" PRIu64 "\n",
                             coreID, readAddress, readLength));
@@ -1022,6 +1034,10 @@ void ArielCore::handleWriteRequest(ArielWriteEvent* wEv) {
             commitWriteEvent(physAddr, writeAddress, (uint32_t) writeLength, payloadPtr);
         } else {
             commitWriteEvent(physAddr, writeAddress, (uint32_t) writeLength, NULL);
+        }
+        if (enablePhaseDetection) {
+            const uint64_t address = (const uint64_t) wEv->getInstPtr();
+            fakeStatPhaseDetection->addData(address);
         }
     } else {
         ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Core %" PRIu32 " generating a split write request: Addr=%" PRIu64 " Length=%" PRIu64 "\n",
@@ -1306,6 +1322,7 @@ void ArielCore::handleGpuAckEvent(SST::Event* e){
     }
 }
 #endif
+//starts at line 1118 (1319 - 1118 = 201)
 
 void ArielCore::printCoreStatistics() {
 }

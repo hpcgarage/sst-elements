@@ -57,9 +57,8 @@ class ArielMmapEvent : public ArielEvent {
                 FileID(fileID),
                 virtualAddress(vAddr),
                 allocateLength(len),
-                level(lev),
-                instPtr(ip) {
-
+                level(lev) {
+                    instPtr = ip;
         }
 
         ~ArielMmapEvent() {}
@@ -74,7 +73,7 @@ class ArielMmapEvent : public ArielEvent {
         uint64_t virtualAddress;
         uint64_t allocateLength;
         uint32_t level;
-        uint64_t instPtr;
+        // uint64_t instPtr;
         uint32_t FileID;
 
 };
