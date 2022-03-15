@@ -101,6 +101,7 @@ class ArielCPU : public SST::Component {
         { "fp_sp_scalar_ins",     "Statistic for counting SP-FP Non-SIMD instructons", "instructions", 1 },
         { "fp_sp_ops",            "Statistic for counting SP-FP operations (inst * SIMD width)", "instructions", 1 },
         { "cycles",               "Statistic for counting cycles of the Ariel core.", "cycles", 1 },
+        { "model_time",           "Time spent in modeling", "ns", 1},
         { "active_cycles",        "Statistic for counting active cycles (cycles not idle) of the Ariel core.", "cycles", 1 })
 
     SST_ELI_DOCUMENT_SUBCOMPONENT_SLOTS(

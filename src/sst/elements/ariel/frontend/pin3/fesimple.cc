@@ -471,6 +471,22 @@ VOID WriteInstructionWriteOnly(THREADID thr, ADDRINT* writeAddr, UINT32 writeSiz
 
 }
 
+VOID WriteInstructionConditionalBranch(THREADID thr, ADDRINT ip)
+{
+
+    // TODO: Currently, we just get  the IP of the branch. We can
+    // get the target info in the future.
+    if(enable_output) {
+        if(thr < core_count) {
+            ArielCommand ac;
+            ac.command = ARIEL_CONDITIONAL_BRANCH;
+            ac.instPtr = (uint64_t) ip;
+            tunnel->writeMessage(thr, ac);
+        }
+    }
+
+}
+
 VOID IncrementFunctionRecord(VOID* funcRecord)
 {
     ArielFunctionRecord* arielFuncRec = (ArielFunctionRecord*) funcRecord;
@@ -569,6 +585,12 @@ VOID InstrumentInstruction(INS ins, VOID *v)
                 IARG_INST_PTR,
                 IARG_UINT32, instClass,
                 IARG_UINT32, simdOpWidth,
+                IARG_END);
+    } else if( INS_IsBranch(ins) && INS_HasFallThrough(ins) ) {
+        INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)
+                WriteInstructionConditionalBranch,
+                IARG_THREAD_ID,
+                IARG_INST_PTR,
                 IARG_END);
     } else {
         INS_InsertPredicatedCall(ins, IPOINT_BEFORE, (AFUNPTR)

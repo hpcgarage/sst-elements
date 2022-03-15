@@ -260,6 +260,7 @@ class ArielCore : public ComponentExtension {
         Statistic<uint64_t>* statFPSPSIMDIns;
         Statistic<uint64_t>* statFPSPScalarIns;
         Statistic<uint64_t>* statFPSPOps;
+        Statistic<uint64_t>* model_time;
 
         uint32_t pending_transaction_count;
         uint32_t pending_gpu_transaction_count;
