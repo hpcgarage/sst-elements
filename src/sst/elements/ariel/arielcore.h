@@ -32,6 +32,8 @@
 #include <stdint.h>
 #include <poll.h>
 
+#include <fstream>
+
 #include <string>
 #include <queue>
 #include <unordered_map>
@@ -180,6 +182,9 @@ class ArielCore : public ComponentExtension {
         uint32_t coreID;
         uint32_t maxPendingTransactions;
 
+        std::string tracefile;
+        std::ofstream tracefp;
+
 #ifdef HAVE_CUDA
         size_t totalTransfer;
         bool gpu_enabled;
@@ -255,6 +260,7 @@ class ArielCore : public ComponentExtension {
         Statistic<uint64_t>* statFPSPSIMDIns;
         Statistic<uint64_t>* statFPSPScalarIns;
         Statistic<uint64_t>* statFPSPOps;
+        Statistic<uint64_t>* model_time;
 
         uint32_t pending_transaction_count;
         uint32_t pending_gpu_transaction_count;

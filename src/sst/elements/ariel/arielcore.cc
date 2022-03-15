@@ -15,6 +15,8 @@
 
 #include <sst_config.h>
 #include "arielcore.h"
+#include <iostream>
+#include <chrono>
 
 #ifdef HAVE_CUDA
 #include <../balar/balar_event.h>
@@ -59,6 +61,11 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
     pendingTransactions = new std::unordered_map<SimpleMem::Request::id_t, SimpleMem::Request*>();
     pending_transaction_count = 0;
 
+    tracefile = "/tmp/arielcore";
+    tracefile = tracefile + std::to_string((uint64_t)id) + ".ssv";
+
+    tracefp.open(tracefile, std::ios::out | std::ios::trunc);
+
 #ifdef HAVE_CUDA
     midTransfer = false;
     remainingTransfer = 0;
@@ -100,6 +107,10 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
     statFPSPOps = registerStatistic<uint64_t>("fp_sp_ops", subID);
     statFPDPOps = registerStatistic<uint64_t>("fp_dp_ops", subID);
 
+    // Model time
+    model_time = registerStatistic<uint64_t>("model_time", subID);
+
+
     free(subID);
 
     memmgr->registerInterruptHandler(coreID, new ArielMemoryManager::InterruptHandler<ArielCore>(this, &ArielCore::handleInterrupt));
@@ -131,6 +142,8 @@ ArielCore::~ArielCore() {
     if(enableTracing && traceGen) {
         delete traceGen;
     }
+
+    tracefp.close();
 }
 
 void ArielCore::setCacheLink(SimpleMem* newLink) {
@@ -288,7 +301,7 @@ void ArielCore::handleEvent(SimpleMem::Request* event) {
                     if( verbosity >= 16) {
 	                for(int i = 0; i < getPageTransfer(); i++)
                             output->verbose(CALL_INFO, 16, 0, "%" PRIu32 ", ",
-                                getDataAddress()[i]);
+                               getDataAddress()[i]);
                         output->verbose(CALL_INFO, 16, 0, "\n");
                     }
 
@@ -782,6 +795,9 @@ bool ArielCore::hasDrainCompleted() const {
 }
 
 bool ArielCore::refillQueue() {
+
+    auto model_start = std::chrono::steady_clock::now();
+
     ARIEL_CORE_VERBOSE(16, output->verbose(CALL_INFO, 16, 0, "Refilling event queue for core %" PRIu32 "...\n", coreID));
 
     while(coreQ->size() < maxQLength) {
@@ -803,6 +819,10 @@ bool ArielCore::refillQueue() {
             case ARIEL_OUTPUT_STATS:
                 fprintf(stdout, "Performing statistics output at simulation time = %" PRIu64 " cycles\n", getCurrentSimTimeNano());
                 performGlobalStatisticOutput();
+                break;
+            case ARIEL_CONDITIONAL_BRANCH:
+                //printf("Recieved info on conditional branch: %ld\n", ac.instPtr);
+                // TODO: Send info to phase detector
                 break;
 
             case ARIEL_START_INSTRUCTION:
@@ -835,10 +855,14 @@ bool ArielCore::refillQueue() {
 
                         switch(ac.command) {
                             case ARIEL_PERFORM_READ:
+                                // PAT
+                                    //printf("0 %"PRIu64" %"PRIu64"\n", ac.instPrt, ac.inst.addr);
+                                    tracefp << "0 " << ac.instPtr << " " << ac.inst.addr << std::endl;
                                     createReadEvent(ac.inst.addr, ac.inst.size);
                                     break;
 
                             case ARIEL_PERFORM_WRITE:
+                                    tracefp << "1 " << ac.instPtr << " " << ac.inst.addr << std::endl;
                                     createWriteEvent(ac.inst.addr, ac.inst.size, &ac.inst.payload[0]);
                                     break;
 
@@ -901,6 +925,9 @@ bool ArielCore::refillQueue() {
     }
 
     ARIEL_CORE_VERBOSE(16, output->verbose(CALL_INFO, 16, 0, "Refilling event queue for core %" PRIu32 " is complete\n", coreID));
+    auto model_stop = std::chrono::steady_clock::now();
+    auto model_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
     return true;
 }
 
@@ -911,6 +938,8 @@ void ArielCore::handleFreeEvent(ArielFreeEvent* rFE) {
 }
 
 void ArielCore::handleReadRequest(ArielReadEvent* rEv) {
+    auto model_start = std::chrono::steady_clock::now();
+
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Core %" PRIu32 " processing a read event...\n", coreID));
 
     const uint64_t readAddress = rEv->getAddress();
@@ -982,9 +1011,13 @@ void ArielCore::handleReadRequest(ArielReadEvent* rEv) {
 
     statReadRequests->addData(1);
     statReadRequestSizes->addData(readLength);
+    auto model_stop = std::chrono::steady_clock::now();
+    auto model_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
 }
 
 void ArielCore::handleWriteRequest(ArielWriteEvent* wEv) {
+    auto model_start = std::chrono::steady_clock::now();
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Core %" PRIu32 " processing a write event...\n", coreID));
 
     const uint64_t writeAddress = wEv->getAddress();
@@ -1070,6 +1103,9 @@ void ArielCore::handleWriteRequest(ArielWriteEvent* wEv) {
 
     statWriteRequests->addData(1);
     statWriteRequestSizes->addData(writeLength);
+    auto model_stop = std::chrono::steady_clock::now();
+    auto model_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
 }
 
 
@@ -1312,6 +1348,9 @@ void ArielCore::printCoreStatistics() {
 
 bool ArielCore::processNextEvent() {
 
+    auto model_start = std::chrono::steady_clock::now();
+
+
     // Upon every call, check if the core is drained and we are fenced. If so, unfence
     // return true; /* Todo: reevaluate if this is needed */
     // Attempt to refill the queue
@@ -1448,6 +1487,10 @@ bool ArielCore::processNextEvent() {
                 output->fatal(CALL_INFO, -4, "Unknown event type has arrived on core %" PRIu32 "\n", coreID);
                 break;
     }
+
+    auto model_stop = std::chrono::steady_clock::now();
+    auto model_delta = std::chrono::duration_cast<std::chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
 
     // If the event has actually been processed this cycle then remove it from the queue
     if(removeEvent) {
