@@ -57,6 +57,7 @@ class ArielCPU : public SST::Component {
         {"arieltool", "Path to the Ariel PIN-tool shared library", ""},
         {"launcher", "Specify the launcher to be used for instrumentation, default is path to PIN", STRINGIZE(PINTOOL_EXECUTABLE)},
         {"executable", "Executable to trace", ""},
+        {"appstdin", "Specify a file to use for the program's stdin", ""},
         {"launchparamcount", "Number of parameters supplied for the launch tool", "0" },
         {"launchparam%(launchparamcount)", "Set the parameter to the launcher", "" },
         {"envparamcount", "Number of environment parameters to supply to the Ariel executable, default=-1 (use SST environment)", "-1"},

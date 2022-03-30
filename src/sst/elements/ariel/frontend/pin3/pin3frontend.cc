@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 #include <time.h>
 
@@ -70,6 +71,8 @@ Pin3Frontend::Pin3Frontend(ComponentId_t id, Params& params, uint32_t cores, uin
     if("" == executable) {
         output->fatal(CALL_INFO, -1, "The input deck did not specify an executable to be run against PIN\n");
     }
+
+    stdin_file = params.find<std::string>("appstdin", "");
 
     uint32_t app_argc = (uint32_t) params.find<uint32_t>("appargcount", 0);
     output->verbose(CALL_INFO, 1, 0, "Model specifies that there are %" PRIu32 " application arguments\n", app_argc);
@@ -271,7 +274,7 @@ void Pin3Frontend::init(unsigned int phase)
         // Init the child_pid = 0, this prevents problems in emergencyShutdown()
         // if forkPINChild() calls fatal (i.e. the child_pid would not be set)
         child_pid = 0;
-        child_pid = forkPINChild(appLauncher.c_str(), execute_args, execute_env);
+        child_pid = forkPINChild(appLauncher.c_str(), execute_args, execute_env, stdin_file);
         output->verbose(CALL_INFO, 1, 0, "Returned from launching PIN.  Waiting for child to attach.\n");
 
         tunnel->waitForChild();
@@ -295,7 +298,7 @@ GpuDataTunnel* Pin3Frontend::getDataTunnel() {
 }
 #endif
 
-int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::string, std::string>& app_env) {
+int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::string, std::string>& app_env, std::string stdin_file) {
     // If user only wants to init the simulation then we do NOT fork the binary
     if(Simulation::getSimulation()->getSimulationMode() == Simulation::INIT)
         return 0;
@@ -379,7 +382,41 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
     }
         return (int) the_child;
     } else {
+        if ("" != stdin_file){
+            printf("Patrick - redirecting io\n");
+            output->verbose(CALL_INFO, 1, 0, "Redirecting child I/O\n"); //TODO: add better message
+            /* fd = creat, close(1), dup(fd), close(fd) */
+            int fd = creat(stdin_file.c_str(), O_RDONLY);
+            if (-1 == fd) {
+                output->fatal(CALL_INFO, 1, "Failed to open file for reading: %s. creat returned %d\n", stdin_file, errno);
+            }
+            printf("Patrick - file opened\n");
+
+            int ret = close(STDIN_FILENO); //close stdin
+            if (-1 == ret) {
+                printf("Patrick - Failed to close stdin. Errno is %d\n", errno);
+                output->fatal(CALL_INFO, 1, "Call to close failed. Error: %d\n", errno);
+
+            }
+            printf("Patrick - stdin closed\n");
+
+            ret = dup(fd); // lowest available descriptor (1) now points to `fd`
+            if (-1 == ret) {
+                output->fatal(CALL_INFO, 1, "Call to dup failed. Error: %d\n", errno);
+            }
+
+            printf("Patrick - fd duped\n");
+
+            ret = close(fd); // No longer need this fd for the file
+            if (-1 == ret) {
+                output->fatal(CALL_INFO, 1, "Call to close failed. Error: %d\n", errno);
+            }
+            
+            printf("Patrick - done redirecting io\n");
+
+        }
         output->verbose(CALL_INFO, 1, 0, "Launching executable: %s...\n", app);
+
 
         if(0 == app_env.size()) {
 #if defined(SST_COMPILE_MACOSX)
