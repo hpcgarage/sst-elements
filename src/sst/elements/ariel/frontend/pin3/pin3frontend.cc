@@ -383,36 +383,10 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
         return (int) the_child;
     } else {
         if ("" != stdin_file){
-            printf("Patrick - redirecting io\n");
             output->verbose(CALL_INFO, 1, 0, "Redirecting child I/O\n"); //TODO: add better message
-            /* fd = creat, close(1), dup(fd), close(fd) */
-            int fd = creat(stdin_file.c_str(), O_RDONLY);
-            if (-1 == fd) {
-                output->fatal(CALL_INFO, 1, "Failed to open file for reading: %s. creat returned %d\n", stdin_file, errno);
+            if (!freopen(stdin_file.c_str(), "r", stdin)) {
+                output->fatal(CALL_INFO, 1, 0, "Failed to redirect input\n");
             }
-            printf("Patrick - file opened\n");
-
-            int ret = close(STDIN_FILENO); //close stdin
-            if (-1 == ret) {
-                printf("Patrick - Failed to close stdin. Errno is %d\n", errno);
-                output->fatal(CALL_INFO, 1, "Call to close failed. Error: %d\n", errno);
-
-            }
-            printf("Patrick - stdin closed\n");
-
-            ret = dup(fd); // lowest available descriptor (1) now points to `fd`
-            if (-1 == ret) {
-                output->fatal(CALL_INFO, 1, "Call to dup failed. Error: %d\n", errno);
-            }
-
-            printf("Patrick - fd duped\n");
-
-            ret = close(fd); // No longer need this fd for the file
-            if (-1 == ret) {
-                output->fatal(CALL_INFO, 1, "Call to close failed. Error: %d\n", errno);
-            }
-            
-            printf("Patrick - done redirecting io\n");
 
         }
         output->verbose(CALL_INFO, 1, 0, "Launching executable: %s...\n", app);
