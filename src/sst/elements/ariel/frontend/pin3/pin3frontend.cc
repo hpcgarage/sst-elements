@@ -75,6 +75,8 @@ Pin3Frontend::Pin3Frontend(ComponentId_t id, Params& params, uint32_t cores, uin
     redirect_info.stdin_file = params.find<std::string>("appstdin", "");
     redirect_info.stdout_file = params.find<std::string>("appstdout", "");
     redirect_info.stderr_file = params.find<std::string>("appstderr", "");
+    redirect_info.stdoutappend = params.find<std::uint32_t>("appstdoutappend", "0");
+    redirect_info.stderrappend = params.find<std::uint32_t>("appstderrappend", "0");
 
     uint32_t app_argc = (uint32_t) params.find<uint32_t>("appargcount", 0);
     output->verbose(CALL_INFO, 1, 0, "Model specifies that there are %" PRIu32 " application arguments\n", app_argc);
@@ -395,14 +397,22 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
 
         if ("" != redirect_info.stdout_file){
             output->verbose(CALL_INFO, 1, 0, "Redirecting child stdout to file %s\n", redirect_info.stdout_file);
-            if (!freopen(redirect_info.stdout_file.c_str(), "w+", stdout)) {
+            std::string mode = "w+";
+            if (redirect_info.stdoutappend) {
+                mode = "a+";
+            }
+            if (!freopen(redirect_info.stdout_file.c_str(), mode.c_str(), stdout)) {
                 output->fatal(CALL_INFO, 1, 0, "Failed to redirect stdout\n");
             }
         }
 
         if ("" != redirect_info.stderr_file){
             output->verbose(CALL_INFO, 1, 0, "Redirecting child stderr from file %s\n", redirect_info.stderr_file);
-            if (!freopen(redirect_info.stderr_file.c_str(), "w+", stderr)) {
+            std::string mode = "w+";
+            if (redirect_info.stderrappend) {
+                mode = "a+";
+            }
+            if (!freopen(redirect_info.stderr_file.c_str(), mode.c_str(), stderr)) {
                 output->fatal(CALL_INFO, 1, 0, "Failed to redirect stderr\n");
             }
         }

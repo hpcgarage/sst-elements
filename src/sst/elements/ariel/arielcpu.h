@@ -60,6 +60,8 @@ class ArielCPU : public SST::Component {
         {"appstdin", "Specify a file to use for the program's stdin", ""},
         {"appstdout", "Specify a file to use for the program's stdeout", ""},
         {"appstderr", "Specify a file to use for the program's stderr", ""},
+        {"appstdoutappend", "If appstdout is set, set this to 1 to append the file intead of overwriting", "0"},
+        {"appstderrappend", "If appstderr is set, set this to 1 to append the file intead of overwriting", "0"},
         {"launchparamcount", "Number of parameters supplied for the launch tool", "0" },
         {"launchparam%(launchparamcount)", "Set the parameter to the launcher", "" },
         {"envparamcount", "Number of environment parameters to supply to the Ariel executable, default=-1 (use SST environment)", "-1"},
