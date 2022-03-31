@@ -237,8 +237,8 @@ void RequestGenCPU::handleEvent( Interfaces::SimpleMem::Request* ev) {
 		} else if ( ev->cmd == Interfaces::SimpleMem::Request::Command::WriteResp ) {
 			requestsPending[WRITE]--;
 		} else if( ev->cmd == Interfaces::SimpleMem::Request::Command::CustomCmd ){
-                        requestsPending[CUSTOM]--;
-                }
+				requestsPending[CUSTOM]--;
+		}
 
 		// If all the parts of this request are now completed then we will mark it for
 		// deletion and update any pending requests which are depending on us

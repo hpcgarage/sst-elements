@@ -154,6 +154,7 @@ public:
             {"GetSX_uncache_recv",      "Noncacheable Event: GetSX received", "count", 4},
             {"GetSResp_uncache_recv",   "Noncacheable Event: GetSResp received", "count", 4},
             {"GetXResp_uncache_recv",   "Noncacheable Event: GetXResp received", "count", 4},
+            {"model_time",              "Time spent in modeling", "ns", 1},
             {"default_stat",            "Default statistic used for unexpected events/cases/etc. Should be 0, if not, check for missing statistic registrations.", "none", 7})
 
     SST_ELI_DOCUMENT_SUBCOMPONENT_SLOTS(
@@ -306,6 +307,9 @@ private:
     Statistic<uint64_t>* statRetryEvents;
     Statistic<uint64_t>* statUncacheRecv[(int)Command::LAST_CMD];
     Statistic<uint64_t>* statCacheRecv[(int)Command::LAST_CMD];
+
+    // Model time
+    Statistic<uint64_t>* model_time;
 };
 
 }}

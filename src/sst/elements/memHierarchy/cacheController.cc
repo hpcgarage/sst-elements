@@ -18,6 +18,7 @@
 #include <sst/core/simulation.h>
 #include <sst/core/interfaces/stringEvent.h>
 #include <sst/core/timeLord.h>
+#include <chrono>
 
 #include "cacheController.h"
 #include "memEvent.h"
@@ -37,6 +38,7 @@ using namespace SST::MemHierarchy;
 
 /* Handle incoming event on the cache links */
 void Cache::handleEvent(SST::Event * ev) {
+    auto model_start = chrono::steady_clock::now();
     MemEventBase* event = static_cast<MemEventBase*>(ev);
     if (!clockIsOn_)
         turnClockOn();
@@ -53,6 +55,9 @@ void Cache::handleEvent(SST::Event * ev) {
     }
 
     eventBuffer_.push_back(event);
+    auto model_stop = chrono::steady_clock::now();
+    auto model_delta = chrono::duration_cast<chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
 }
 
 /* 
@@ -88,6 +93,9 @@ void Cache::processPrefetchEvent(SST::Event * ev) {
 
 /* Clock handler */
 bool Cache::clockTick(Cycle_t time) {
+
+    auto model_start = chrono::steady_clock::now();
+
     timestamp_++;
 
     // Drain any outgoing messages
@@ -178,6 +186,10 @@ bool Cache::clockTick(Cycle_t time) {
     coherenceMgr_->clearRetryBuffer();
 
     idle &= coherenceMgr_->checkIdle();
+
+    auto model_stop = chrono::steady_clock::now();
+    auto model_delta = chrono::duration_cast<chrono::nanoseconds>(model_stop - model_start);
+    model_time->addData(model_delta.count());
 
     // Disable lower-level cache clocks if they're idle
     if (eventBuffer_.empty() && retryBuffer_.empty() && idle) {

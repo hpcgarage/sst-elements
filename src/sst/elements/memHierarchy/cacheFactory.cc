@@ -132,6 +132,9 @@ void Cache::createCoherenceManager(Params &params) {
     /* Load prefetcher, listeners, if any : Requires MSHR since drop levels depend on MSHR size*/
     createListeners(params);
 
+    // Setup model time stat
+    model_time = registerStatistic<uint64_t>("model_time");
+
     coherenceMgr_ = NULL;
     std::string inclusive = (itype == "inclusive") ? "true" : "false";
     std::string mesi = (protocol == CoherenceProtocol::MESI) ? "true" : "false";
