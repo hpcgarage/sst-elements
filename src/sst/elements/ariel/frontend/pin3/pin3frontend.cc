@@ -386,15 +386,13 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
     }
         return (int) the_child;
     } else {
-        //TODO: consdier append/overwrite setting
-
+        //Do I/O redirection before exec
         if ("" != redirect_info.stdin_file){
             output->verbose(CALL_INFO, 1, 0, "Redirecting child stdin from file %s\n", redirect_info.stdin_file);
             if (!freopen(redirect_info.stdin_file.c_str(), "r", stdin)) {
                 output->fatal(CALL_INFO, 1, 0, "Failed to redirect stdin\n");
             }
         }
-
         if ("" != redirect_info.stdout_file){
             output->verbose(CALL_INFO, 1, 0, "Redirecting child stdout to file %s\n", redirect_info.stdout_file);
             std::string mode = "w+";
@@ -405,7 +403,6 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
                 output->fatal(CALL_INFO, 1, 0, "Failed to redirect stdout\n");
             }
         }
-
         if ("" != redirect_info.stderr_file){
             output->verbose(CALL_INFO, 1, 0, "Redirecting child stderr from file %s\n", redirect_info.stderr_file);
             std::string mode = "w+";
@@ -416,9 +413,7 @@ int Pin3Frontend::forkPINChild(const char* app, char** args, std::map<std::strin
                 output->fatal(CALL_INFO, 1, 0, "Failed to redirect stderr\n");
             }
         }
-
         output->verbose(CALL_INFO, 1, 0, "Launching executable: %s...\n", app);
-
 
         if(0 == app_env.size()) {
 #if defined(SST_COMPILE_MACOSX)
