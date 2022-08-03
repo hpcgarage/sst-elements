@@ -16,6 +16,9 @@
 #include <sst_config.h>
 #include "sst/elements/memHierarchy/util.h"
 #include "membackend/dramSim3Backend.h"
+#include "sst/core/link.h"
+
+
 
 using namespace SST;
 using namespace SST::MemHierarchy;
@@ -35,19 +38,49 @@ DRAMSim3Memory::DRAMSim3Memory(ComponentId_t id, Params &params) : SimpleMemBack
     }
     unsigned int ramSizeMiB = ramSize.getRoundedValue() / (1024*1024);
 
+    self_link = configureSelfLink("Self", "1 ns",
+            new Event::Handler<DRAMSim3Memory>(this, &DRAMSim3Memory::handleSelfEvent));
+
     memSystem = new dramsim3::MemorySystem(configIniFilename, outputDirname, readCB, writeCB);
+
+}
+
+void DRAMSim3Memory::learn(int phase, int latency) {
+    latency_map[phase] = latency;
+}
+
+bool DRAMSim3Memory::isKnown(int phase){
+    return latency_map.find(phase) != latency_map.end();
+}
+int DRAMSim3Memory::getPhase(){
+    return current_phase;
+}
+void DRAMSim3Memory::setPhase(int phase) {
+    current_phase = phase;
 }
 
 
 bool DRAMSim3Memory::issueRequest(ReqId id, Addr addr, bool isWrite, unsigned ){
     bool ok = memSystem->WillAcceptTransaction(addr, isWrite);
     if (!ok) return false;
-    ok = memSystem->AddTransaction(addr, isWrite);
+    //ok = memSystem->AddTransaction(addr, isWrite);
+    bool trained_phase = latency_map.find(current_phase) != latency_map.end();
+    if (self_link->mode == SST::Link::RUN && current_phase != -1 && trained_phase) {
+        self_link->send(latency_map[current_phase], new MemCtrlEvent(id, addr));
+        ok = true;
+        //printf("+++ Sending on self_link\n");
+    } else {
+        ok = memSystem->AddTransaction(addr, isWrite);
+        dramReqs[addr].push_back(id);
+        //printf("--- Sending to DRAMSim3\n");
+    }
     if (!ok) return false;  // This *SHOULD* always be ok
 #ifdef __SST_DEBUG_OUTPUT__
     output->debug(_L10_, "Issued transaction for address %" PRIx64 "\n", (Addr)addr);
 #endif
-    dramReqs[addr].push_back(id);
+
+    //self_link->send(1, new MemCtrlEvent(id, addr));
+
     return true;
 }
 
@@ -64,10 +97,17 @@ void DRAMSim3Memory::finish(){
     memSystem->PrintStats();
 }
 
+void DRAMSim3Memory::handleSelfEvent(SST::Event *event) {
+     MemCtrlEvent *ev = static_cast<MemCtrlEvent*>(event);
 
+     handleMemResponse(ev->reqId);
+
+     //dramSimDone(0/*unused*/, ev->addr, 0/*unused*/);
+}
 
 void DRAMSim3Memory::dramSimDone(unsigned int id, uint64_t addr, uint64_t clockcycle){
     std::deque<ReqId> &reqs = dramReqs[addr];
+    //patrick
 #ifdef __SST_DEBUG_OUTPUT__
     output->debug(_L10_, "Memory Request for %" PRIx64 " Finished [%zu reqs]\n", (Addr)addr, reqs.size());
 #endif

@@ -50,6 +50,8 @@
 #include "ariel_shmem.h"
 #include "arieltracegen.h"
 
+#include "phase_detector.h"
+
 #ifdef HAVE_CUDA
 #include "arielgpuev.h"
 #endif
@@ -74,8 +76,49 @@ class ArielCore : public ComponentExtension {
             ArielMemoryManager* memMgr, const uint32_t perform_address_checks, Params& params);
         ~ArielCore();
 
+        class PhaseData : public StandardMem::CustomData
+        {
+
+                public:
+                        int phase;
+                        PhaseData(int phase_) {
+                                phase = phase_;
+                        }
+                        ~PhaseData() {
+                        }
+                        uint64_t getRoutingAddress() {
+                                return 0;
+                        }
+                        uint64_t getSize() {
+                                return 1;
+                        }
+                        PhaseData* makeResponse() {
+                                return NULL;
+                        }
+                        bool needsResponse() {
+                                return false;
+                        }
+                        std::string getString() {
+                                return "PhaseData";
+                        }
+                        std::string serialization_name() const {
+                                return "PhaseData";
+                        }
+                        uint32_t cls_id() const {
+                                return 110193;
+                        }
+                        void serialize_order(SST::Core::Serialization::serializer& UNUSED(ser)) {
+
+                        }
+
+        };
+
+
+        inline static ArielCore *headCore;
         bool isCoreHalted() const;
         bool isCoreStalled() const;
+        static void phaseDetectorCallback(phase_id_type);
+        void phaseDetectorCallbackMember(phase_id_type);
 #ifdef HAVE_CUDA
         cudaMemcpyKind getKind() const;
         bool getMidTransfer() const;
@@ -192,6 +235,7 @@ class ArielCore : public ComponentExtension {
         bool writePayloads;
         uint32_t coreID;
         uint32_t maxPendingTransactions;
+        PhaseDetector pd;
 
 #ifdef HAVE_CUDA
         size_t totalTransfer;

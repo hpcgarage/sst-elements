@@ -55,8 +55,42 @@ public:
     virtual bool clock(Cycle_t cycle);
     virtual void finish();
 
+    Link *self_link;
+
+    int current_phase = -1;
+    int bignum = 0;
+    //std::map<int, int> latency_map = { {0, bignum}, {1, bignum}, {2, bignum}, {3, bignum}, {4, bignum}, {5, bignum}, {6, bignum}, };
+    std::map<int, int> latency_map = { };
+
+    class MemCtrlEvent : public SST::Event {
+    public:
+        MemCtrlEvent( ReqId id_, Addr addr_) : SST::Event(), reqId(id_), addr(addr_)
+        { }
+
+        ReqId reqId;
+        Addr addr;
+
+    private:
+        MemCtrlEvent() {} // For Serialization only
+
+    public:
+        void serialize_order(SST::Core::Serialization::serializer &ser)  override {
+            Event::serialize_order(ser);
+            ser & reqId;  // Cannot serialize pointers unless they are a serializable object
+       }
+
+        ImplementSerializable(SST::MemHierarchy::DRAMSim3Memory::MemCtrlEvent);
+    };
+
+public:
+    void learn(int phase, int latency);
+    bool isKnown(int phase);
+    int getPhase();
+    void setPhase(int phase);
+
 protected:
     void dramSimDone(unsigned int id, uint64_t addr, uint64_t clockcycle);
+    void handleSelfEvent(SST::Event *event);
 
     dramsim3::MemorySystem *memSystem;
     std::map<uint64_t, std::deque<ReqId> > dramReqs;

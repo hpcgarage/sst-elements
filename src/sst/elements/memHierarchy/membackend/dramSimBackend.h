@@ -61,6 +61,8 @@ protected:
     DRAMSim::MultiChannelMemorySystem *memSystem;
     std::map<uint64_t, std::deque<ReqId> > dramReqs;
 
+    Link *self_link;
+
 private:
 };
 

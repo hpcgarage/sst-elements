@@ -35,6 +35,7 @@ enum ArielEventType {
     SWITCH_POOL,
     FLUSH,
     FENCE,
+    PHASE_NOTIF,
 #ifdef HAVE_CUDA
     GPU
 #endif

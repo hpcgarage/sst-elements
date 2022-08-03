@@ -24,6 +24,8 @@
 #include "sst/elements/memHierarchy/memEvent.h"
 #include "sst/elements/memHierarchy/customcmd/customCmdMemory.h"
 
+#include "circular_buffer.hpp"
+
 namespace SST {
 namespace MemHierarchy {
 
@@ -36,6 +38,7 @@ class MemBackend;
 
 class MemBackendConvertor : public SubComponent {
   public:
+      std::vector<Cycle_t> latencies;
 
 /* ELI definitions for subclasses */
 #define MEMBACKENDCONVERTOR_ELI_PARAMS {"debug_level",     "(uint) Debugging level: 0 (no output) to 10 (all output). Output also requires that SST Core be compiled with '--enable-debug'", "0"},\

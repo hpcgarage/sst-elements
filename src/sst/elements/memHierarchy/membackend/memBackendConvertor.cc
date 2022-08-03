@@ -19,6 +19,8 @@
 #include "sst/elements/memHierarchy/memoryController.h"
 #include "membackend/memBackendConvertor.h"
 #include "membackend/memBackend.h"
+#include "membackend/dramSim3Backend.h"
+#include "sst/elements/ariel/arielcore.h"
 
 using namespace SST;
 using namespace SST::MemHierarchy;
@@ -88,10 +90,31 @@ void MemBackendConvertor::handleMemEvent(  MemEvent* ev ) {
 }
 
 void MemBackendConvertor::handleCustomEvent( Interfaces::StandardMem::CustomData * info, Event::id_type evId, std::string rqstr) {
-    uint32_t id = genReqId();
-    CustomReq* req = new CustomReq( info, evId, rqstr, id );
-    m_requestQueue.push_back( req );
-    m_pendingRequests[id] = req;
+    //uint32_t id = genReqId();
+    //CustomReq* req = new CustomReq( info, evId, rqstr, id );
+    //m_requestQueue.push_back( req );
+    //m_pendingRequests[id] = req;
+    SST::ArielComponent::ArielCore::PhaseData *pd = dynamic_cast<SST::ArielComponent::ArielCore::PhaseData*>(info);
+
+    //PHASE - Recieved phase change notif
+    printf("->The phase I recieved is %d\n", pd->phase);
+
+
+    DRAMSim3Memory *mb = dynamic_cast<DRAMSim3Memory*>(m_backend);
+
+    if (pd->phase != -1) {
+        if (!mb->isKnown(pd->phase)) {
+            printf("Phase %d wasn't known\n", pd->phase);
+            if (latencies.size() != 0) {
+                int avglat = (int)std::reduce(latencies.begin(), latencies.end(), 0.0) / latencies.size();
+                mb->learn(pd->phase, avglat);
+            }
+        }
+    }
+
+    latencies.clear();
+
+    mb->setPhase(pd->phase);
 }
 
 bool MemBackendConvertor::clock(Cycle_t cycle) {
@@ -193,6 +216,8 @@ void MemBackendConvertor::doResponse( ReqId reqId, uint32_t flags ) {
             Debug(_L10_,"doResponse req is done. %s\n", event->getBriefString().c_str());
 
             Cycle_t latency = m_cycleCount - event->getDeliveryTime();
+
+            latencies.push_back(latency);
 
             doResponseStat( event->getCmd(), latency );
 

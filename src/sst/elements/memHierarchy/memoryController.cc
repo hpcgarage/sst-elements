@@ -472,7 +472,7 @@ void MemController::handleCustomEvent(MemEventBase * ev) {
 
     CustomCmdMemHandler::MemEventInfo evInfo = customCommandHandler_->receive(ev);
     if (evInfo.shootdown) {
-        out.verbose(CALL_INFO, 1, 0, "%s, WARNING: Custom event expects a shootdown but this memory controller does not support shootdowns. Ev = %s\n", getName().c_str(), ev->getVerboseString(dlevel).c_str());
+        //out.verbose(CALL_INFO, 1, 0, "%s, WARNING: Custom event expects a shootdown but this memory controller does not support shootdowns. Ev = %s\n", getName().c_str(), ev->getVerboseString(dlevel).c_str());
     }
 
     Interfaces::StandardMem::CustomData* info = customCommandHandler_->ready(ev);
@@ -482,6 +482,9 @@ void MemController::handleCustomEvent(MemEventBase * ev) {
                 getCurrentSimCycle(), getNextClockCycle(clockTimeBase_) - 1, getName().c_str(), 
                 ev->getVerboseString().c_str());
     }
+    //Interfaces::StandardMem::CustomData* info = dynamic_cast<Interfaces::StandardMem::CustomReq*>(ev)->data;
+    //Interfaces::StandardMem::CustomData* info = NULL; 
+
     memBackendConvertor_->handleCustomEvent(info, ev->getID(), ev->getRqstr());
 }
 

@@ -14,10 +14,17 @@
 // distribution.
 
 #include <sst_config.h>
+//#include <sst/core/event.h>
 #include "arielcore.h"
+//#include "sst/elements/memHierarchy/memTypes.h"
 
 #ifdef HAVE_CUDA
 #include <../balar/balar_event.h>
+
+//SST::ArielComponent::ArielCore* headCore;
+//SST::ArielComponent::ArielCore *SST::ArielComponent::ArielCore::headCore;
+//ArielCore* ArielCore::headCore;
+
 using namespace SST::BalarComponent;
 #endif
 
@@ -108,6 +115,11 @@ ArielCore::ArielCore(ComponentId_t id, ArielTunnel *tunnel,
     std::string traceGenName = params.find<std::string>("tracegen", "");
     enableTracing = ("" != traceGenName);
 
+    pd.init_phase_detector();
+    pd.register_listeners(&this->phaseDetectorCallback);
+    headCore = this;
+    //pd.register_listeners(&(this->phaseDetectorCallback));
+
     // If we enabled tracing then open up the correct file.
     if(enableTracing) {
         Params interfaceParams = params.get_scoped_params("tracer");
@@ -182,7 +194,6 @@ void ArielCore::commitReadEvent(const uint64_t address,
         cacheLink->send(req);
     }
 }
-
 void ArielCore::commitWriteEvent(const uint64_t address,
         const uint64_t virtAddress, const uint32_t length, const uint8_t* payload) {
 
@@ -251,6 +262,7 @@ void ArielCore::commitFlushEvent(const uint64_t address,
 
 void ArielCore::handleEvent(StandardMem::Request* event) {
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Core %" PRIu32 " handling a memory event.\n", coreID));
+
     StandardMem::Request::id_t mev_id = event->getID();
     auto find_entry = pendingTransactions->find(mev_id);
 
@@ -671,7 +683,20 @@ void ArielCore::createReadEvent(uint64_t address, uint32_t length) {
     ArielReadEvent* ev = new ArielReadEvent(address, length);
     coreQ->push(ev);
 
+    pd.detect(address);
+
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a READ event, addr=%" PRIu64 ", length=%" PRIu32 "\n", address, length));
+}
+
+void ArielCore::phaseDetectorCallback(phase_id_type phase) {
+    headCore->phaseDetectorCallbackMember(phase);
+    //ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a READ event, addr=%" PRIu64 ", length=%" PRIu32 "\n", address, length));
+}
+
+void ArielCore::phaseDetectorCallbackMember(phase_id_type phase) {
+    ArielCore::PhaseData *data = new ArielCore::PhaseData(phase);
+    StandardMem::CustomReq *req = new StandardMem::CustomReq(data, 0, 0, 0);
+    cacheLink->send(req);
 }
 
 void ArielCore::createAllocateEvent(uint64_t vAddr, uint64_t length, uint32_t level, uint64_t instPtr) {
@@ -700,6 +725,8 @@ void ArielCore::createFreeEvent(uint64_t vAddr) {
 void ArielCore::createWriteEvent(uint64_t address, uint32_t length, const uint8_t* payload) {
     ArielWriteEvent* ev = new ArielWriteEvent(address, length, payload);
     coreQ->push(ev);
+
+    pd.detect(address);
 
     ARIEL_CORE_VERBOSE(4, output->verbose(CALL_INFO, 4, 0, "Generated a WRITE event, addr=%" PRIu64 ", length=%" PRIu32 "\n", address, length));
 }

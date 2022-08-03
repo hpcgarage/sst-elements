@@ -47,10 +47,19 @@ DRAMSimMemory::DRAMSimMemory(ComponentId_t id, Params &params) : SimpleMemBacken
             this, &DRAMSimMemory::dramSimDone);
 
     memSystem->RegisterCallbacks(readDataCB, writeDataCB, NULL);
+    self_link = configureSelfLink("Self", 1,
+            new Event::Handler<DRAMSimMemory>(this, &DRAMSimMemory::handleSelfEvent));
+
+}
+
+void DRAMSimMemory::handleSelfEvent(SST::Event *event) {
+     MemCtrlEvent *ev = static_cast<MemCtrlEvent*>(event);
+     dramSimDone(0/*unused*/, ev->addr, 0/*unused*/){
 }
 
 
 bool DRAMSimMemory::issueRequest(ReqId id, Addr addr, bool isWrite, unsigned ){
+    /*
     bool ok = memSystem->willAcceptTransaction(addr);
     if(!ok) return false;
     ok = memSystem->addTransaction(isWrite, addr);
@@ -58,6 +67,9 @@ bool DRAMSimMemory::issueRequest(ReqId id, Addr addr, bool isWrite, unsigned ){
 #ifdef __SST_DEBUG_OUTPUT__
     output->debug(_L10_, "Issued transaction for address %" PRIx64 "\n", (Addr)addr);
 #endif
+*/
+    //patrick
+    self_link->send(1, new MemCtrlEvent(id));
     dramReqs[addr].push_back(id);
     return true;
 }
