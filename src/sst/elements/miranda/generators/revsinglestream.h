@@ -45,11 +45,17 @@ public:
          )
 
       SST_ELI_DOCUMENT_PARAMS(
-            { "startat",          "Sets the start *index* for this generator", "2048" },
-            { "stopat",           "Sets the stop *index* for this generator, stop < start", "0" },
+            { "startat",          "Sets the start *index* for this generator", "0" },
+            { "stopat",           "Sets the stop *index* for this generator", "524228" },
             { "verbose",          "Sets the verbosity of the output", "0" },
-            { "datawidth",        "Sets the width of the memory operation", "8" },
-            { "stride",           "Sets the stride, since this is a reverse stream this is subtracted per iteration, def=1", "1" },
+            { "stride",           "Sets the stride", "1" },
+            { "gapLocations",           "Index for the jump in the buffer array", "0" },
+            { "gapJump",           "amount for the gap that occurs at the gap location", "1" },
+            { "arrGap",           "gap between each pattern", "100" },
+            { "issueCount",           "number of requests", "1000" },
+            { "byteAmount",     "number of bytes per request", "8" },
+            { "length",       "Sets the length of the pattern", "8" },
+
          )
 
    private:
@@ -58,7 +64,14 @@ public:
       uint64_t datawidth;
       uint64_t nextIndex;
       uint64_t stride;
+      uint64_t gapLocations;
+      uint64_t gapJump;
+      uint64_t arrgap;
+      uint64_t issueCount;
+      uint64_t reqLength;
+      uint64_t reqSize;
 
+      ReqOperation memOp;
       Output*  out;
 
 };

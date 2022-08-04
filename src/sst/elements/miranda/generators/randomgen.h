@@ -14,15 +14,21 @@
 // distribution.
 
 
+//This will be the AMG Spatter Pattern Implementation
+
 #ifndef _H_SST_MIRANDA_RANDOM_GEN
 #define _H_SST_MIRANDA_RANDOM_GEN
 
 #include <sst/elements/miranda/mirandaGenerator.h>
 #include <sst/core/output.h>
 #include <sst/core/rng/sstrng.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
 
 #include <queue>
-
+using namespace std;
 using namespace SST::RNG;
 
 namespace SST {
@@ -48,19 +54,24 @@ public:
         )
 
 	SST_ELI_DOCUMENT_PARAMS(
-		{ "verbose",          "Sets the verbosity output of the generator", "0" },
-    		{ "count",            "Count for number of items being requested", "1024" },
-    		{ "length",           "Length of requests", "8" },
-    		{ "max_address",	  "Maximum address allowed for generation", "16384" },
-    		{ "issue_op_fences",  "Issue operation fences, \"yes\" or \"no\", default is yes", "yes" }
+		{ "patternType",          "Determines what pattern is used", "1" },
+		{ "reqSize",          "determines memory size of request", "8" },
+
+    	
         )
 private:
 	uint64_t reqLength;
+	uint64_t patternType;
+	uint64_t reqSize;
 	uint64_t maxAddr;
+	uint64_t nextAddr;
+	uint64_t arrGap;
 	uint64_t issueCount;
 	bool issueOpFences;
-	SSTRandom* rng;
+	vector<int> vect;
 	Output*  out;
+	ReqOperation memOp;
+
 
 };
 

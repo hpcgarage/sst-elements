@@ -18,7 +18,12 @@
 #include <sst/core/params.h>
 #include <sst/core/rng/marsaglia.h>
 #include <sst/elements/miranda/generators/randomgen.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
 
+using namespace std;
 using namespace SST::Miranda;
 
 
@@ -29,47 +34,60 @@ RandomGenerator::RandomGenerator( ComponentId_t id, Params& params ) :
 
 void RandomGenerator::build(Params& params) {
 	const uint32_t verbose = params.find<uint32_t>("verbose", 0);
-
 	out = new Output("RandomGenerator[@p:@l]: ", verbose, 0, Output::STDOUT);
+	patternType = params.find<uint64_t>("patternType", 1);
+	reqSize = params.find<uint64_t>("reqSize", 8);
 
-	issueCount = params.find<uint64_t>("count", 1000);
-	reqLength  = params.find<uint64_t>("length", 8);
-	maxAddr    = params.find<uint64_t>("max_address", 524288);
+	ifstream myfile;
+    myfile.open("\\wsl.localhost\\Ubuntu\\home\\cderolf\\morrigan\\sst-elements\\src\\sst\\elements\\miranda\\generators\\spatterpatterns.txt", ios::in);
+    if ( myfile.fail()) {
+            out->verbose(CALL_INFO, 1, 0, "Will issue %s operations\n", strerror(errno));
 
-	rng = new MarsagliaRNG(11, 31);
+    }
+    string myline;
+    if ( myfile.is_open() ) {
+        for (int j = 1; j < patternType; j++) {
+            getline (myfile, myline);
+        }
+        getline (myfile, myline, ',');
+        if (myline.compare("Gather") == 0) {
+			memOp = READ;
+        } else if (myline.compare("Scatter") == 0) {
+			memOp = WRITE;
+        }
+        for (int i = 0; i < 16; i++) {
+            getline (myfile, myline, ',');
+            vect.push_back(stoi(myline));
+        }
+        getline (myfile, myline, ':');
 
-	out->verbose(CALL_INFO, 1, 0, "Will issue %" PRIu64 " operations\n", issueCount);
+        getline (myfile, myline, ',');
+        arrGap = stoi(myline); // this should populate the delta or arrgap param
+        getline (myfile, myline, ':');
+        getline (myfile, myline);
+        issueCount = stoi(myline); // this should populate the issue count param
+    } else {
+    }
+    out->verbose(CALL_INFO, 1, 0, "Will issue %" PRIu64 " operations\n", vect.size());
 	out->verbose(CALL_INFO, 1, 0, "Request lengths: %" PRIu64 " bytes\n", reqLength);
 	out->verbose(CALL_INFO, 1, 0, "Maximum address: %" PRIu64 "\n", maxAddr);
-
-	issueOpFences = params.find<std::string>("issue_op_fences", "yes") == "yes";
 
 }
 
 RandomGenerator::~RandomGenerator() {
 	delete out;
-	delete rng;
 }
 
 void RandomGenerator::generate(MirandaRequestQueue<GeneratorRequest*>* q) {
 	out->verbose(CALL_INFO, 4, 0, "Generating next request number: %" PRIu64 "\n", issueCount);
 
-	const uint64_t rand_addr = rng->generateNextUInt64();
-	// Ensure we have a reqLength aligned request
-	const uint64_t addr_under_limit = (rand_addr % maxAddr);
-	const uint64_t addr = (addr_under_limit < reqLength) ? addr_under_limit :
-		(rand_addr % maxAddr) - (rand_addr % reqLength);
-
-	const double op_decide = rng->nextUniform();
-
-	// Populate request
-	q->push_back(new MemoryOpRequest(addr, reqLength, (op_decide < 0.5) ? READ : WRITE));
-
-	if (issueOpFences) {
-	    q->push_back(new FenceOpRequest());
-	}
-
-	issueCount--;
+ 	for (int i = 0; i < vect.size(); i++) {
+        nextAddr = nextAddr + vect[i];
+        q->push_back(new MemoryOpRequest(nextAddr, reqSize, memOp));
+		issueCount--;
+    }
+	// What is the next address?
+	nextAddr = (nextAddr + arrGap);
 }
 
 bool RandomGenerator::isFinished() {

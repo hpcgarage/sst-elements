@@ -1,4 +1,4 @@
-// Copyright 2009-2021 NTESS. Under the terms
+/// Copyright 2009-2021 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
@@ -33,20 +33,28 @@ void ReverseSingleStreamGenerator::build(Params& params) {
 	//out = new Output("ReverseSingleStreamGenerator[@p:@l]: ", verbose, 0, Output::STDOUT);
 	out = new Output("ReverseSingleStreamGenerator[@p]: ", verbose, 0, Output::STDOUT);
 
-	stopIndex   = params.find<uint64_t>("stopat", 0);
-	startIndex  = params.find<uint64_t>("startat", 1024);
-	datawidth   = params.find<uint64_t>("datawidth", 8);
-	stride      = params.find<uint64_t>("stride", 1);
+	issueCount = params.find<uint64_t>("issueCount", 1000);
+	stopIndex   = params.find<uint64_t>("stopat", 524228);
+	startIndex  = params.find<uint64_t>("startat", 0);
+	gapLocations = params.find<uint64_t>("gapLocations", 0);
+	gapJump = params.find<uint64_t>("gapJumps", 5);
+	arrgap = params.find<uint64_t>("arrGap", 100);
+	stride = params.find<uint64_t>("stride", 1);
+	reqLength = params.find<uint64_t>("requestLength", 8);
+	reqSize = params.find<uint64_t>("byteAmount", 8);
 
-	if(startIndex < stopIndex) {
-		out->fatal(CALL_INFO, -1, "Start address (%" PRIu64 ") must be greater than stop address (%" PRIu64 ") in reverse stream generator",
+
+	//does not support multiple gap locations or multiple jumps
+
+	if(startIndex > stopIndex) {
+		out->fatal(CALL_INFO, -1, "Start address (%" PRIu64 ") must be less than stop address (%" PRIu64 ") in ms-1",
 			startIndex, stopIndex);
 	}
 
 	out->verbose(CALL_INFO, 1, 0, "Start Address:         %" PRIu64 "\n", startIndex);
 	out->verbose(CALL_INFO, 1, 0, "Stop Address:          %" PRIu64 "\n", stopIndex);
-	out->verbose(CALL_INFO, 1, 0, "Data width:            %" PRIu64 "\n", datawidth);
-	out->verbose(CALL_INFO, 1, 0, "Stride:                %" PRIu64 "\n", stride);
+	// out->verbose(CALL_INFO, 1, 0, "Data width:            %" PRIu64 "\n", datawidth);
+	// out->verbose(CALL_INFO, 1, 0, "Stride:                %" PRIu64 "\n", stride);
 
 	nextIndex = startIndex;
 }
@@ -57,15 +65,27 @@ ReverseSingleStreamGenerator::~ReverseSingleStreamGenerator() {
 
 void ReverseSingleStreamGenerator::generate(MirandaRequestQueue<GeneratorRequest*>* q) {
 	out->verbose(CALL_INFO, 4, 0, "Generating next request at address: %" PRIu64 "\n", nextIndex);
-
-	q->push_back(new MemoryOpRequest(nextIndex * datawidth, datawidth, READ));
-
-	// What is the next address?
-	nextIndex = nextIndex - stride;
+	int buff[reqLength] = {};
+	for (int i = 0; i < reqLength; i++) {
+		if (i == 0) {
+			buff[i] = 0;
+		} else if (i == gapLocations) {
+			buff[i] = buff[i - 1] + gapJump;
+		} else {
+			buff[i] = buff[i - 1] + stride;
+		}
+	}
+	for (int i = 0; i < reqLength; i++) {
+		nextIndex = nextIndex + buff[i];
+		q->push_back(new MemoryOpRequest(nextIndex, reqSize, READ));
+		issueCount--;
+	}
+// issue count decrements after reqlength requests to simulate a request of length 8 (customizeable length coming soon)
+	nextIndex = nextIndex + arrgap;
 }
 
 bool ReverseSingleStreamGenerator::isFinished() {
-	return (nextIndex == stopIndex);
+	return (issueCount == 0);
 }
 
 void ReverseSingleStreamGenerator::completed() {

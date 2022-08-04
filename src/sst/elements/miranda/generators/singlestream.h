@@ -1,13 +1,13 @@
-// Copyright 2009-2021 NTESS. Under the terms
+// Copyright 2009-2022 NTESS. Under the terms
 // of Contract DE-NA0003525 with NTESS, the U.S.
 // Government retains certain rights in this software.
 //
-// Copyright (c) 2009-2021, NTESS
+// Copyright (c) 2009-2022, NTESS
 // All rights reserved.
 //
 // Portions are copyright of other developers:
 // See the file CONTRIBUTORS.TXT in the top level directory
-// the distribution for more information.
+// of the distribution for more information.
 //
 // This file is part of the SST software package. For license
 // information, see the LICENSE file in the top level directory of the
@@ -45,12 +45,17 @@ public:
          )
 
       SST_ELI_DOCUMENT_PARAMS(
+          //length changed to 1
             { "verbose",      "Sets the verbosity of the output", "0" },
             { "count",        "Total number of requests", "1000" },
-            { "length",       "Sets the length of the request", "8" },
+            { "length",       "Sets the length of the pattern", "8" },
             { "startat",      "Sets the start address of the array", "0" },
             { "max_address",  "Maximum address allowed for generation", "524288" },
             { "memOp",        "All reqeusts will be of this type, [Read/Write]", "Read" },
+            //NEW May have to remove for hardcode including the addition below
+            { "arrGap",        "Gap between patterns", "1000" },
+            { "stride",        "stride of data pattern", "1" },
+            { "byteAmount",     "number of bytes per request", "8" },
          )
 
    private:
@@ -59,6 +64,10 @@ public:
       uint64_t issueCount;
       uint64_t nextAddr;
       uint64_t startAddr;
+      //new
+      uint64_t arrgap;
+      uint64_t reqSize;
+      uint64_t stride;
 
       Output*  out;
       ReqOperation memOp;

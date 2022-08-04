@@ -172,7 +172,7 @@ fesimple.so : fesimple.o
 	    -lpin3dwarf -ldl-dynamic -nostdlib -lstlport-dynamic -lm-dynamic -lc-dynamic -lunwind-dynamic
 
 fesimple.o : $(top_srcdir)/src/sst/elements/ariel/frontend/pin3/fesimple.cc
-	$(CXX) -g -Wall -Werror -Wno-unknown-pragmas -D__PIN__=1 -DPIN_CRT=1 \
+	$(CXX) -g -Wall  -Wno-unknown-pragmas -D__PIN__=1 -DPIN_CRT=1 \
 	    -fno-stack-protector -fno-exceptions -funwind-tables -fasynchronous-unwind-tables -fno-rtti \
 	    -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -fabi-version=2 \
 	    $(CPPFLAGS) \

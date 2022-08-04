@@ -17,80 +17,56 @@
 #include <sst_config.h>
 #include <sst/core/params.h>
 #include <sst/elements/miranda/generators/streambench.h>
+#include <vector>
 
+using namespace SST::Miranda;
 using namespace SST::Miranda;
 
 
+
 STREAMBenchGenerator::STREAMBenchGenerator( ComponentId_t id, Params& params ) :
-    RequestGenerator(id, params) {
-        build(params);
-    }
+	RequestGenerator(id, params) {
+            build(params);
+        }
 
 void STREAMBenchGenerator::build(Params& params) {
 	const uint32_t verbose = params.find<uint32_t>("verbose", 0);
+	reqSize = params.find<uint64_t>("reqSize", 8);
+	out = new Output("RandomGenerator[@p:@l]: ", verbose, 0, Output::STDOUT);
+	v = {0, 32, 32, -96, 160, 32, 32, -96, 160, 32, 32, -96, 160, 32, 32, -96};
+	arrGap = 32;
+	maxAddr = 12400;
+	maxIssueCount = 81006;
+	issueCount = maxIssueCount;
+	reqLength = 16;
+    out->verbose(CALL_INFO, 1, 0, "Will issue %" PRIu64 " operations\n", issueCount);
+	out->verbose(CALL_INFO, 1, 0, "Request lengths: %" PRIu64 " bytes\n", reqSize);
 
-	out = new Output("STREAMBenchGenerator[@p:@l]: ", verbose, 0, Output::STDOUT);
-
-	n = params.find<uint64_t>("n", 10000);
-	reqLength = params.find<uint64_t>("operandwidth", 8);
-
-	start_a = params.find<uint64_t>("start_a", 0);
-	const uint64_t def_b = start_a + (n * reqLength);
-
-	start_b = params.find<uint64_t>("start_b", def_b);
-
-	const uint64_t def_c = start_b + (n * reqLength);
-	start_c = params.find<uint64_t>("start_c", def_c);
-
-	n_per_call = params.find<uint64_t>("n_per_call", 1);
-
-	i = 0;
-
-	out->verbose(CALL_INFO, 1, 0, "STREAM-N length is %" PRIu64 "\n", n);
-	out->verbose(CALL_INFO, 1, 0, "operandwidth       %" PRIu64 "\n", reqLength);
-	out->verbose(CALL_INFO, 1, 0, "Start of array a @ 0x%" PRIx64 "\n", start_a);
-	out->verbose(CALL_INFO, 1, 0, "Start of array b @ 0x%" PRIx64 "\n", start_b);
-	out->verbose(CALL_INFO, 1, 0, "Start of array c @ 0x%" PRIx64 "\n", start_c);
-	out->verbose(CALL_INFO, 1, 0, "Array Length:      %" PRIu64 " bytes\n", (n * reqLength));
-	out->verbose(CALL_INFO, 1, 0, "Total arrays:      %" PRIu64 " bytes\n", (3 * n * reqLength));
-	out->verbose(CALL_INFO, 1, 0, "N-per-generate     %" PRIu64 "\n", n_per_call);
 }
+
 
 STREAMBenchGenerator::~STREAMBenchGenerator() {
 	delete out;
 }
 
 void STREAMBenchGenerator::generate(MirandaRequestQueue<GeneratorRequest*>* q) {
-	for(uint64_t j = 0; j < n_per_call; ++j) {
-		out->verbose(CALL_INFO, 4, 0, "Array index: %" PRIu64 "\n", i);
+	out->verbose(CALL_INFO, 4, 0, "Generating next request number: %" PRIu64 "\n", issueCount);
 
-		// If we reached our limit then step out of the generation
-		if(i == n) {
-			break;
+ 	for (int i = 0; i < v.size(); i++) {
+        nextAddr = nextAddr + v[i];
+		if (nextAddr >= maxAddr || nextAddr < 0) {
+			nextAddr = 0;
 		}
-
-                MemoryOpRequest* read_b  = new MemoryOpRequest(start_b + (i * reqLength), reqLength, READ);
-                MemoryOpRequest* read_c  = new MemoryOpRequest(start_c + (i * reqLength), reqLength, READ);
-                MemoryOpRequest* write_a = new MemoryOpRequest(start_a + (i * reqLength), reqLength, WRITE);
-
-		write_a->addDependency(read_b->getRequestID());
-		write_a->addDependency(read_c->getRequestID());
-
-		out->verbose(CALL_INFO, 8, 0, "Issuing READ request for address %" PRIu64 "\n", (start_b + (i * reqLength)));
-		q->push_back(read_b);
-
-		out->verbose(CALL_INFO, 8, 0, "Issuing READ request for address %" PRIu64 "\n", (start_c + (i * reqLength)));
-		q->push_back(read_c);
-
-		out->verbose(CALL_INFO, 8, 0, "Issuing WRITE request for address %" PRIu64 "\n", (start_a + (i * reqLength)));
-		q->push_back(write_a);
-
-		i++;
-	}
+		out->verbose(CALL_INFO, 4, 0, "addr: %" PRIu64 "\n", nextAddr);
+        q->push_back(new MemoryOpRequest(nextAddr, reqSize, READ));
+		issueCount--;
+    }
+	// What is the next address?
+	nextAddr = (nextAddr + arrGap);
 }
 
 bool STREAMBenchGenerator::isFinished() {
-	return (i == n);
+	return (issueCount <= 0 || issueCount > maxIssueCount);
 }
 
 void STREAMBenchGenerator::completed() {
