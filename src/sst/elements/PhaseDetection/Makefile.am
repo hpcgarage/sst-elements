@@ -8,19 +8,8 @@ AM_CPPFLAGS += \
 compdir = $(pkglibdir)
 comp_LTLIBRARIES = libPhaseDetection.la
 libPhaseDetection_la_SOURCES = \
-	basicEvent.h \
-	example0.h \
-	example0.cc \
-	example1.h \
-	example1.cc \
-	basicLinks.h \
-	basicLinks.cc \
- 	basicStatistics.h \
-    basicStatistics.cc \
-    basicClocks.h \
-    basicClocks.cc \
-	basicParams.h \
-	basicParams.cc
+	WorkingSetSignature.h \
+	WorkingSetSignature.cc
 
 deprecated_libPhaseDetection_sources =
 
