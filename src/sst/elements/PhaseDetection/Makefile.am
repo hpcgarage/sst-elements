@@ -18,24 +18,8 @@ libPhaseDetection_la_SOURCES += $(deprecated_libPhaseDetection_sources)
 endif
 
 EXTRA_DIST = \
-    README \
-    tests/testsuite_default_simpleComponents.py \
-    tests/basicClocks.py \
-    tests/basicParams.py \
-    tests/basicStatistics1.py \
-    tests/example0.py \
-    tests/example1.py \
-    tests/basicLinks.py \
-    tests/basicStatistics0.py \
-    tests/basicStatistics2.py \
-    tests/refFiles/basicClocks.out \
-    tests/refFiles/basicLinks.out \
-    tests/refFiles/basicParams.out \
-    tests/refFiles/basicStatistics0.out \
-    tests/refFiles/basicStatistics1.out \
-    tests/refFiles/basicStatistics2.out \
-    tests/refFiles/example0.out \
-    tests/refFiles/example1.out
+    README
+# TODO: Add test files to this list
 
 deprecated_EXTRA_DIST =
 
