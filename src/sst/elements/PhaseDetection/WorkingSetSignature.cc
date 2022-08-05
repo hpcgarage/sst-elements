@@ -14,7 +14,7 @@
 // distribution.
 
 #include "sst_config.h"
-#include "strideprefetch.h"
+#include "WorkingSetSignature.h"
 
 #include <vector>
 #include "stdlib.h"
