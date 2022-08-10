@@ -27,52 +27,120 @@
 using namespace SST;
 using namespace SST::PhaseDetection;
 
+double WorkingSetSignature::diff_sigs(bitvec sig1, bitvec sig2) {
+    // Number of bits in common divided by total number of bits set
+    return static_cast<double>((sig1 ^ sig2).count()) / (sig1 | sig2).count();
+}
+
+uint64_t WorkingSetSignature::hash_address(Addr address) {
+    //TODO Find out what's going on with the 64 and 1024 here.
+
+    //drop the bottom {drop_bits} bits of the signature
+    //hash it then return the top {log2_signature_len} bits of the hash (the number of bits determined by the length of the signature)
+    //use this to then index into a bitvec that represents the current signature to set a specific bit to 1
+    /*sizeof(uint32_t)*/ /* likely 32 if 32-bit MT or 64 if 64-bit MT or other hash */
+    return ((uint32_t) std::hash<bitset<64>>{}(address >> drop_bits)) >> (32  - WorkingSetSignatureConstants::log2_signature_len);
+
+    // return hashed_randomized_address >> (32 /*sizeof(uint32_t)*/ /* likely 32 if 32-bit MT or 64 if 64-bit MT or other hash */ - log2_signature_len);
+    
+    //old: hash<bitset<1024>>()(address_minus_bottom_drop_bits) - time test on big XS: 18.539s
+    //alt: hash<bitset<64>>()(address_minus_bottom_drop_bits) - time test on big XS: 7.962s
+    //not really a hash: hash<uint64_t>()(address_minus_bottom_drop_bits) - time test on big XS: 6.178s
+}
+
+
+
 void WorkingSetSignature::notifyAccess(const CacheListenerNotification& notify) {
     const NotifyAccessType notifyType = notify.getAccessType();
     const NotifyResultType notifyResType = notify.getResultType();
     const Addr addr = notify.getPhysicalAddress();
 
+    // Ignore EVICT and PREFETCH types
     if (notifyType != READ && notifyType != WRITE)
         return;
 
-    // Put address into our recent address list
-    recentAddrList[nextRecentAddressIndex] = addr;
-    nextRecentAddressIndex = (nextRecentAddressIndex + 1) % recentAddrListCount;
+    // Store recieved address
+    if ( UNLIKELY(nextAddrListEntry >= interval_len) ) {
+       //Unreachable
+       output->fatal(CALL_INFO, -1, "Error: This should be unreachable.\n");
+    }
 
-    recheckCountdown = (recheckCountdown + 1) % strideDetectionRange;
+    // Store recieved addr
+    recentAddrList[nextAddrListEntry] = addr;
+    nextAddrListEntry += 1;
 
-    notifyResType == MISS ? missEventsProcessed++ : hitEventsProcessed++;
-
-    if(recheckCountdown == 0)
-        DetectStride();
+    // Once we reach the end of an interval, classify the phase, notify listners and clear
+    // the recentAddrList
+    if( nextAddrListEntry == interval_len ) {
+        DetectPhase();
+        nextAddrListEntry = 0;
+    }
 }
 
-Addr WorkingSetSignature::getAddressByIndex(uint32_t index) {
-    return recentAddrList[(nextRecentAddressIndex + 1 + index) % recentAddrListCount];
-}
 
-void WorkingSetSignature::DetectStride() {
+void WorkingSetSignature::DetectPhase() {
     /*  Needs to be updated with current MemHierarchy Commands/States, MemHierarchyInterface */
-    MemEvent* ev = NULL;
     uint32_t stride;
     bool foundStride = true;
     Addr targetAddress = 0;
     uint32_t strideIndex;
 
+    // Classify phase
+
+    //first, check if the phase is stable since the difference measure is acceptably low
+    if (diff_sigs(current_signature, last_signature) < threshold) {
+        stable_count += 1;
+        if (stable_count >= stable_min && phase == -1) {
+            //add the current signature to the phase table and make the phase #/phase id to its index
+            phase_table.push_back(current_signature);
+            phase = phase_table.size() - 1; // or indexof curr_sig?
+            //line 194 in the python
+        }
+    } else { //line 196 in python
+        //if difference too high then it's not stable and we might now know the phase
+        stable_count = 0;
+        phase = -1;
+
+        //see if we've entered a phase we have seen before
+        if (!phase_table.empty()) { //line 201 python
+            double best_diff = threshold;
+            for (auto phase_table_iterator = phase_table.begin(); phase_table_iterator != phase_table.end(); phase_table_iterator++) {
+                const auto s = *phase_table_iterator;
+                const auto diff = diff_sigs(current_signature, s);
+                // difference_scores_from_phase_table.push_back(diff);
+                if (diff < threshold && diff < best_diff) {
+                    phase = std::distance(phase_table.begin(), phase_table_iterator);
+                    best_diff = diff;
+                    //set current phase to the phase of the one with the lowest difference from current (which is the index in the phase table)
+                }
+            }
+        }
+    }
+    //whether or not the phase is stable, we need to update last phase and whatnot
+    last_signature = current_signature;
+    current_signature.reset();
+    
+    //add the current phase ID to the phase trace - from line 209 in python
+    phase_history->push_back(phase);
+
+    // Create memevent
+    MemEvent* ev = NULL;
+
+    // Notify listeners
+
+    /*
+    for (auto f : listeners) {
+        f(phase);
+    }
+    */
+
+
+    // OLD STUFF
     for(uint32_t i = 0; i < recentAddrListCount - 1; ++i) {
         for(uint32_t j = i + 1; j < recentAddrListCount; ++j) {
             stride = j - i;
             strideIndex = 1;
             foundStride = true;
-
-            for(uint32_t k = j + stride; k < recentAddrListCount; k += stride, strideIndex++) {
-                targetAddress = getAddressByIndex(k);
-
-                if(getAddressByIndex(k) - getAddressByIndex(i) != (strideIndex * stride)) {
-                        foundStride = false;
-                        break;
-                }
-            }
 
             if(foundStride) {
                 Addr targetPrefetchAddress = targetAddress + (strideReach * stride);
@@ -83,8 +151,6 @@ void WorkingSetSignature::DetectStride() {
                             "Issue prefetch, target address: %" PRIx64 ", prefetch address: %" PRIx64 " (reach out: %" PRIu32 ", stride=%" PRIu32 "), prefetchAddress=%" PRIu64 "\n",
                             targetAddress, targetAddress + (strideReach * stride),
                             (strideReach * stride), stride, targetPrefetchAddress);
-
-                        statPrefetchOpportunities->addData(1);
 
                         // Check next address is aligned to a cache line boundary
                         assert((targetAddress + (strideReach * stride)) % blockSize == 0);
@@ -104,12 +170,10 @@ void WorkingSetSignature::DetectStride() {
                             output->verbose(CALL_INFO, 2, 0, "Issue prefetch, target address: %" PRIx64 ", prefetch address: %" PRIx64 " (reach out: %" PRIu32 ", stride=%" PRIu32 ")\n",
                                     targetAddress, targetPrefetchAddress, (strideReach * stride), stride);
                             ev = new MemEvent(getName(), targetPrefetchAddress, targetPrefetchAddress, Command::GetS);
-                            statPrefetchOpportunities->addData(1);
                         } else {
                             output->verbose(CALL_INFO, 2, 0, "Cancel prefetch issue, request exceeds physical page limit\n");
                             output->verbose(CALL_INFO, 4, 0, "Target address: %" PRIx64 ", page=%" PRIx64 ", Prefetch address: %" PRIx64 ", page=%" PRIx64 "\n", targetAddress, targetAddressPhysPage, targetPrefetchAddress, targetPrefetchAddressPage);
 
-                            statPrefetchIssueCanceledByPageBoundary->addData(1);
                             ev = NULL;
                         }
                 }
@@ -141,7 +205,6 @@ void WorkingSetSignature::DetectStride() {
         }
 
         if(! inHistory) {
-            statPrefetchEventsIssued->addData(1);
 
             // Remove the oldest cache line
             if(currentHistCount == prefetchHistoryCount) {
@@ -166,7 +229,6 @@ void WorkingSetSignature::DetectStride() {
 
             delete ev;
         } else {
-            statPrefetchIssueCanceledByHistory->addData(1);
             output->verbose(CALL_INFO, 2, 0, "Prefetch canceled - same cache line is found in the recent prefetch history.\n");
                 delete ev;
         }
@@ -184,7 +246,13 @@ WorkingSetSignature::WorkingSetSignature(ComponentId_t id, Params& params) : Cac
     output = new Output(new_prefix, verbosity, 0, Output::STDOUT);
     free(new_prefix);
 
-    recheckCountdown = 0;
+    /* Algorithm Parameters */
+    interval_len = params.find<uint64_t>("interval_len", 10000);
+    stable_min   = params.find<uint32_t>("stable_min",   4);
+    threshold    = params.find<float>("threshold",    0.5);
+    /*bits_log2   = params.find<uint32_t>("bits_log2",    10);*/
+    drop_bits    = params.find<uint32_t>("drop_bits",    3);
+
     blockSize = params.find<uint64_t>("cache_line_size", 64);
 
     prefetchHistoryCount = params.find<uint32_t>("history", 16);
@@ -192,29 +260,32 @@ WorkingSetSignature::WorkingSetSignature(ComponentId_t id, Params& params) : Cac
 
     strideReach = params.find<uint32_t>("reach", 2);
     strideDetectionRange = params.find<uint64_t>("detect_range", 4);
-    recentAddrListCount = params.find<uint32_t>("address_count", 64);
     pageSize = params.find<uint64_t>("page_size", 4096);
 
     uint32_t overrunPB = params.find<uint32_t>("overrun_page_boundaries", 0);
     overrunPageBoundary = (overrunPB == 0) ? false : true;
 
-    nextRecentAddressIndex = 0;
-    recentAddrList = (Addr*) malloc(sizeof(Addr) * recentAddrListCount);
+    // Variable initialization
+    current_signature.reset();
+    last_signature.reset();
+    phase_table.clear();
+    phase_history->clear();
+    stable_count = 0;
+    nextAddrListEntry = 0;
+    recentAddrList = (Addr*) malloc(sizeof(Addr) * interval_len);
+    phase = -1;
 
-    for(uint32_t i = 0; i < recentAddrListCount; ++i) {
+    for(uint32_t i = 0; i < interval_len; ++i) {
         recentAddrList[i] = (Addr) 0;
     }
+
 
     output->verbose(CALL_INFO, 1, 0, "WorkingSetSignature created, cache line: %" PRIu64 ", page size: %" PRIu64 "\n",
         blockSize, pageSize);
 
-    missEventsProcessed = 0;
-    hitEventsProcessed = 0;
 
-    statPrefetchOpportunities = registerStatistic<uint64_t>("prefetch_opportunities");
-    statPrefetchEventsIssued = registerStatistic<uint64_t>("prefetches_issued");
-    statPrefetchIssueCanceledByPageBoundary = registerStatistic<uint64_t>("prefetches_canceled_by_page_boundary");
-    statPrefetchIssueCanceledByHistory = registerStatistic<uint64_t>("prefetches_canceled_by_history");
+    statNumIntervals = registerStatistic<uint64_t>("num_intervals");
+    statNumPhases = registerStatistic<uint64_t>("num_phases");
 }
 
 WorkingSetSignature::~WorkingSetSignature() {
