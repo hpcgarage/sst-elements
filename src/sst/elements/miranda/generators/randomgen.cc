@@ -37,12 +37,14 @@ void RandomGenerator::build(Params& params) {
 	out = new Output("RandomGenerator[@p:@l]: ", verbose, 0, Output::STDOUT);
 	patternType = params.find<uint64_t>("patternType", 1);
 	reqSize = params.find<uint64_t>("reqSize", 8);
+    nextAddr = 0;
+    maxAddr = 100000;
+    
 
 	ifstream myfile;
-    myfile.open("\\wsl.localhost\\Ubuntu\\home\\cderolf\\morrigan\\sst-elements\\src\\sst\\elements\\miranda\\generators\\spatterpatterns.txt", ios::in);
+    myfile.open("spatterpatterns.txt", ios::in);
     if ( myfile.fail()) {
             out->verbose(CALL_INFO, 1, 0, "Will issue %s operations\n", strerror(errno));
-
     }
     string myline;
     if ( myfile.is_open() ) {
@@ -69,7 +71,7 @@ void RandomGenerator::build(Params& params) {
     } else {
     }
     out->verbose(CALL_INFO, 1, 0, "Will issue %" PRIu64 " operations\n", vect.size());
-	out->verbose(CALL_INFO, 1, 0, "Request lengths: %" PRIu64 " bytes\n", reqLength);
+	out->verbose(CALL_INFO, 1, 0, "Request lengths: %" PRIu64 " bytes\n", reqSize);
 	out->verbose(CALL_INFO, 1, 0, "Maximum address: %" PRIu64 "\n", maxAddr);
 
 }
@@ -80,9 +82,19 @@ RandomGenerator::~RandomGenerator() {
 
 void RandomGenerator::generate(MirandaRequestQueue<GeneratorRequest*>* q) {
 	out->verbose(CALL_INFO, 4, 0, "Generating next request number: %" PRIu64 "\n", issueCount);
-
  	for (int i = 0; i < vect.size(); i++) {
-        nextAddr = nextAddr + vect[i];
+        if (issueCount == 0) {
+            break;
+        }
+        if (nextAddr >= maxAddr) {
+            nextAddr = 0;
+        }
+        if (vect[i] < 0 && nextAddr < abs(vect[i]) ) {
+            nextAddr = 0;
+        } else {
+            nextAddr = nextAddr + vect[i];
+        }
+        out->verbose(CALL_INFO, 4, 0, "ADDR: %" PRIu64 "\n", nextAddr);
         q->push_back(new MemoryOpRequest(nextAddr, reqSize, memOp));
 		issueCount--;
     }
