@@ -65,7 +65,7 @@ ReverseSingleStreamGenerator::~ReverseSingleStreamGenerator() {
 
 void ReverseSingleStreamGenerator::generate(MirandaRequestQueue<GeneratorRequest*>* q) {
 	out->verbose(CALL_INFO, 4, 0, "Generating next request at address: %" PRIu64 "\n", nextIndex);
-	int buff[reqLength] = {};
+	int* buff = (int*) malloc(64*sizeof(int));
 	for (int i = 0; i < reqLength; i++) {
 		if (i == 0) {
 			buff[i] = 0;
