@@ -90,7 +90,7 @@ public:
     MemEvent* makeNACKResponse(MemEvent* NACKedEvent) {
         MemEvent *me      = new MemEvent(*this);
         me->setResponse(this);
-        me->NACKedEvent_    = NACKedEvent;
+        me->NACKedEvent_    = reinterpret_cast<uintptr_t>(NACKedEvent);
         me->cmd_            = Command::NACK;
         me->instPtr_        = instPtr_;
         me->vAddr_          = vAddr_;
@@ -135,7 +135,7 @@ public:
         addrGlobal_         = true;
         size_               = 0;
         prefetch_           = false;
-        NACKedEvent_        = nullptr;
+        NACKedEvent_        = 0;
         retries_            = 0;
         payload_.clear();
         dirty_              = false;
@@ -145,7 +145,7 @@ public:
     }
 
     /** return the original event that caused a NACK */
-    MemEvent* getNACKedEvent() { return NACKedEvent_; }
+    MemEvent* getNACKedEvent() { return reinterpret_cast<MemEvent*>(NACKedEvent_); }
 
     /** @return  the target Address of this MemEvent */
     Addr getAddr(void) const { return addr_; }
@@ -286,6 +286,16 @@ public:
         return MemEventBase::getBriefString() + str.str();
     }
 
+    virtual std::string toString() const override {
+        std::ostringstream str;
+        if (addr_ != baseAddr_)
+            str << std::hex << " Addr: 0x" << baseAddr_ << "/0x" << addr_;
+        else
+            str << std::hex << " Addr: 0x" << baseAddr_;
+        str << std::dec << " Size: " << size_;
+        return MemEventBase::toString() + str.str();
+    }
+
     virtual bool doDebug(std::set<Addr> &addr) override {
         if (cmd_ == Command::NULLCMD && addr.find(addr_) != addr.end())
             return true;
@@ -301,7 +311,7 @@ private:
     Addr            addr_;              // Address
     Addr            baseAddr_;          // Base (line) address
     bool            addrGlobal_;        // Whether address is a local or global address
-    MemEvent*       NACKedEvent_;       // For a NACK, pointer to the NACKed event
+    uintptr_t       NACKedEvent_;       // For a NACK, pointer to the NACKed event
     int             retries_;           // For NACKed events, how many times a retry has been sent
     dataVec         payload_;           // Data
     bool            prefetch_;          // Whether this request came from a prefetcher

@@ -192,6 +192,13 @@ public:
         return idstring.str() + cmdStr + " Src: " + src_ + " Dst: " + dst_;
     }
 
+    virtual std::string toString() const override {
+        std::string cmdStr(CommandString[(int)cmd_]);
+        std::ostringstream idstring;
+        idstring << "<" << eventID_.first << "," << eventID_.second << "> ";
+        return idstring.str() + cmdStr + " Src: " + src_ + " Dst: " + dst_;
+    }
+
     virtual bool doDebug(std::set<Addr> &UNUSED(addr)) {
         return true;    // Always debug unless we come up with a different way of determining it
     }

@@ -60,6 +60,12 @@ class MemNICBase : public MemLinkBase {
                 MemRtrEvent() : Event(), event(nullptr) { }
                 MemRtrEvent(MemEventBase * ev) : Event(), event(ev) { }
 
+                ~MemRtrEvent() {
+                    if (event) {
+                        delete event;
+                    }
+                }
+
                 virtual Event* clone(void) override {
                     MemRtrEvent *mre = new MemRtrEvent(*this);
                     if (this->event != nullptr)
@@ -149,6 +155,7 @@ class MemNICBase : public MemLinkBase {
                 MemRtrEvent * mre = initQueue.front();
                 initQueue.pop();
                 MemEventInit * ev = static_cast<MemEventInit*>(mre->event);
+                mre->event = nullptr;
                 delete mre;
                 return ev;
             }
@@ -296,6 +303,7 @@ class MemNICBase : public MemLinkBase {
                 } else {
                     MemRtrEvent * mre = static_cast<MemRtrEvent*>(payload);
                     MemEventInit *ev = static_cast<MemEventInit*>(mre->event);
+                    mre->event = nullptr;
                     dbg.debug(_L10_, "%s (memNICBase) received mre during init. %s\n", getName().c_str(), mre->event->getVerboseString(dlevel).c_str());
 
                     /*

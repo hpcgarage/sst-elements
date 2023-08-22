@@ -84,6 +84,7 @@ bool MemNIC::recvNotify(int) {
     MemRtrEvent * mre = doRecv(link_control);
     if (mre) {
         MemEventBase* ev = mre->event;
+        mre->event = nullptr;
         delete mre;
         if (ev) {
             if (is_debug_event(ev)) {
@@ -152,6 +153,7 @@ void MemNIC::emergencyShutdownDebug(Output &out) {
     MemRtrEvent * mre = doRecv(link_control);
     while (mre != nullptr) {
         MemEventBase * ev = mre->event;
+        mre->event = nullptr;
         delete mre;
         if (ev) {
             out.output("      Undelivered message: %s\n", ev->getVerboseString(out.getVerboseLevel()).c_str());
